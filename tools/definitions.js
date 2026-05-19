@@ -1113,12 +1113,21 @@ Blacklisted tokens are filtered BEFORE the LLM even sees pool candidates.`,
   },
 ];
 
-export const tools = toolDefinitions.map((tool) => ({
-  ...tool,
-  function: {
-    ...tool.function,
-    parameters: tool.function.parameters?.type === "object"
-      ? { additionalProperties: false, ...tool.function.parameters }
-      : tool.function.parameters,
-  },
-}));
+// Tools that depend on LPAgent (https://api.lpagent.io). When the user has no
+// LPAGENT_API_KEY and no LPAgent relay configured, these tools always return
+// "no data" — exclude them from the schema so the LLM never wastes a step
+// calling them.
+const LPAGENT_DEPENDENT_TOOLS = new Set(["study_top_lpers", "get_top_lpers"]);
+const HAS_LPAGENT = !!process.env.LPAGENT_API_KEY || String(process.env.LPAGENT_RELAY_ENABLED || "").toLowerCase() === "true";
+
+export const tools = toolDefinitions
+  .filter((tool) => HAS_LPAGENT || !LPAGENT_DEPENDENT_TOOLS.has(tool.function.name))
+  .map((tool) => ({
+    ...tool,
+    function: {
+      ...tool.function,
+      parameters: tool.function.parameters?.type === "object"
+        ? { additionalProperties: false, ...tool.function.parameters }
+        : tool.function.parameters,
+    },
+  }));

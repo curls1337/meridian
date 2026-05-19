@@ -246,19 +246,26 @@ export async function agentLoop(goal, maxSteps = config.llm.maxSteps, sessionHis
       // Keep tool-call history API-valid, but never execute unrecoverable args.
       if (msg.tool_calls) {
         for (const tc of msg.tool_calls) {
-          if (tc.function?.arguments) {
+          if (!tc.function) continue;
+          // Treat missing / empty / whitespace-only arguments as an empty object.
+          // Some Claude variants emit "" for parameter-less tools, which downstream
+          // JSON.parse and the chat-completions API both reject.
+          const raw = tc.function.arguments;
+          if (raw == null || (typeof raw === "string" && raw.trim() === "")) {
+            tc.function.arguments = "{}";
+            continue;
+          }
+          try {
+            JSON.parse(tc.function.arguments);
+          } catch {
             try {
-              JSON.parse(tc.function.arguments);
+              tc.function.arguments = JSON.stringify(JSON.parse(jsonrepair(tc.function.arguments)));
+              log("warn", `Repaired malformed JSON args for ${tc.function.name}`);
             } catch {
-              try {
-                tc.function.arguments = JSON.stringify(JSON.parse(jsonrepair(tc.function.arguments)));
-                log("warn", `Repaired malformed JSON args for ${tc.function.name}`);
-              } catch {
-                tc.function.arguments = "{}";
-                const error = `Invalid tool arguments for ${tc.function.name}`;
-                invalidToolArgErrors.set(tc.id, error);
-                log("error", `${error}: could not repair JSON`);
-              }
+              tc.function.arguments = "{}";
+              const error = `Invalid tool arguments for ${tc.function.name}`;
+              invalidToolArgErrors.set(tc.id, error);
+              log("error", `${error}: could not repair JSON`);
             }
           }
         }
@@ -317,7 +324,12 @@ export async function agentLoop(goal, maxSteps = config.llm.maxSteps, sessionHis
         }
 
         try {
-          functionArgs = JSON.parse(toolCall.function.arguments);
+          const argsRaw = toolCall.function.arguments;
+          if (argsRaw == null || (typeof argsRaw === "string" && argsRaw.trim() === "")) {
+            functionArgs = {};
+          } else {
+            functionArgs = JSON.parse(argsRaw);
+          }
         } catch {
           try {
             functionArgs = JSON.parse(jsonrepair(toolCall.function.arguments));

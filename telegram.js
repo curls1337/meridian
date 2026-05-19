@@ -199,50 +199,126 @@ function createTypingIndicator() {
 
 function toolLabel(name) {
   const labels = {
-    get_token_info: "get token info",
-    get_token_narrative: "get token narrative",
-    get_token_holders: "get token holders",
-    get_top_candidates: "get top candidates",
-    get_pool_detail: "get pool detail",
-    get_active_bin: "get active bin",
-    deploy_position: "deploy position",
-    close_position: "close position",
-    claim_fees: "claim fees",
-    swap_token: "swap token",
-    update_config: "update config",
-    get_my_positions: "get positions",
-    get_wallet_balance: "get wallet balance",
-    check_smart_wallets_on_pool: "check smart wallets",
-    study_top_lpers: "study top LPers",
-    get_top_lpers: "get top LPers",
-    search_pools: "search pools",
-    discover_pools: "discover pools",
+    get_token_info: "🔍 Token info",
+    get_token_narrative: "📰 Token narrative",
+    get_token_holders: "👥 Token holders",
+    get_top_candidates: "📊 Top candidates",
+    get_pool_detail: "🏊 Pool detail",
+    get_active_bin: "📍 Active bin",
+    deploy_position: "🚀 Deploy position",
+    close_position: "🔒 Close position",
+    claim_fees: "💰 Claim fees",
+    swap_token: "🔄 Swap",
+    update_config: "⚙️ Update config",
+    get_my_positions: "📋 My positions",
+    get_wallet_balance: "👛 Wallet balance",
+    check_smart_wallets_on_pool: "🐋 Smart wallets",
+    study_top_lpers: "🎓 Study top LPers",
+    get_top_lpers: "🏆 Top LPers",
+    search_pools: "🔎 Search pools",
+    discover_pools: "🌐 Discover pools",
+    get_recent_decisions: "📜 Recent decisions",
+    list_smart_wallets: "📒 Smart wallets list",
+    add_smart_wallet: "➕ Add smart wallet",
+    remove_smart_wallet: "➖ Remove smart wallet",
+    list_blacklist: "🚫 Blacklist",
+    add_to_blacklist: "🚫 Add to blacklist",
+    remove_from_blacklist: "✅ Remove from blacklist",
+    block_deployer: "🛑 Block deployer",
+    unblock_deployer: "✅ Unblock deployer",
+    list_blocked_deployers: "📋 Blocked deployers",
+    add_lesson: "📝 Add lesson",
+    list_lessons: "📚 Lessons",
+    pin_lesson: "📌 Pin lesson",
+    unpin_lesson: "📍 Unpin lesson",
+    clear_lessons: "🗑️ Clear lessons",
+    get_position_pnl: "📈 Position PnL",
+    get_wallet_positions: "👛 Wallet positions",
+    get_performance_history: "📊 Performance",
+    add_pool_note: "🗒️ Pool note",
+    set_position_note: "🗒️ Position note",
+    self_update: "⬆️ Self update",
+    list_strategies: "🎯 Strategies",
+    get_strategy: "🎯 Strategy detail",
+    add_strategy: "➕ Add strategy",
+    update_strategy: "✏️ Update strategy",
+    delete_strategy: "🗑️ Delete strategy",
+    remove_strategy: "🗑️ Remove strategy",
+    set_active_strategy: "🎯 Activate strategy",
+    get_pool_memory: "🧠 Pool memory",
   };
-  return labels[name] || name.replace(/_/g, " ");
+  return labels[name] || `🔧 ${name.replace(/_/g, " ")}`;
 }
+
+function fmtNumber(value, decimals = 2) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return "—";
+  return n.toLocaleString("en-US", { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+}
+
+function fmtSol(value, decimals = 4) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return "—";
+  return `◎${n.toLocaleString("en-US", { minimumFractionDigits: decimals, maximumFractionDigits: decimals })}`;
+}
+
+function fmtUsd(value, decimals = 2) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return "—";
+  return `$${n.toLocaleString("en-US", { minimumFractionDigits: decimals, maximumFractionDigits: decimals })}`;
+}
+
+function fmtAddr(addr, head = 4, tail = 4) {
+  const s = String(addr || "");
+  if (s.length <= head + tail + 1) return s;
+  return `${s.slice(0, head)}…${s.slice(-tail)}`;
+}
+
+function escapeHtml(text) {
+  return String(text ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
+const DIVIDER = "━━━━━━━━━━━━━━━━━━";
 
 function summarizeToolResult(name, result) {
   if (!result) return "";
-  if (result.error) return result.error;
-  if (result.reason && result.blocked) return result.reason;
+  if (result.error) return String(result.error).slice(0, 80);
+  if (result.reason && result.blocked) return String(result.reason).slice(0, 80);
   switch (name) {
     case "deploy_position":
-      return result.position ? `position ${String(result.position).slice(0, 8)}...` : "submitted";
+      return result.position ? `${fmtAddr(result.position)} ✓` : "submitted";
     case "close_position":
-      return result.success ? "closed" : (result.reason || "failed");
+      if (result.success === false) return result.reason || "failed";
+      if (result.pnl_usd != null) {
+        const pnl = Number(result.pnl_usd);
+        const sign = pnl >= 0 ? "+" : "";
+        return `${sign}${fmtUsd(pnl)} closed`;
+      }
+      return "closed";
     case "claim_fees":
-      return result.claimed_amount != null ? `claimed ${result.claimed_amount}` : "done";
+      return result.claimed_amount != null ? `claimed ${fmtNumber(result.claimed_amount, 4)}` : "done";
     case "update_config":
       return Object.keys(result.applied || {}).join(", ") || "updated";
     case "get_top_candidates":
-      return `${result.candidates?.length ?? 0} candidates`;
+      return `${result.candidates?.length ?? 0} pools found`;
     case "get_my_positions":
-      return `${result.total_positions ?? result.positions?.length ?? 0} positions`;
+      return `${result.total_positions ?? result.positions?.length ?? 0} open`;
     case "get_wallet_balance":
-      return `${result.sol ?? "?"} SOL`;
+      return result.sol != null ? fmtSol(result.sol) : "ok";
     case "study_top_lpers":
     case "get_top_lpers":
       return `${result.lpers?.length ?? 0} LPers`;
+    case "swap_token":
+      if (result.success === false) return "failed";
+      return result.amount_out != null ? `→ ${fmtNumber(result.amount_out, 4)}` : "swapped";
+    case "get_token_info":
+      return result.symbol || "ok";
+    case "search_pools":
+    case "discover_pools":
+      return `${result.pools?.length ?? 0} pools`;
     default:
       return result.success === false ? "failed" : "done";
   }
@@ -264,10 +340,19 @@ export async function createLiveMessage(title, intro = "Starting...") {
   };
 
   function render() {
-    const sections = [state.title];
-    if (state.intro) sections.push(state.intro);
-    if (state.toolLines.length > 0) sections.push(state.toolLines.join("\n"));
-    if (state.footer) sections.push(state.footer);
+    const sections = [];
+    // Header
+    sections.push(`<b>${escapeHtml(state.title)}</b>`);
+    if (state.intro) {
+      sections.push(`<i>${escapeHtml(state.intro)}</i>`);
+    }
+    if (state.toolLines.length > 0) {
+      sections.push(state.toolLines.join("\n"));
+    }
+    if (state.footer) {
+      sections.push(DIVIDER);
+      sections.push(state.footer);
+    }
     return sections.join("\n\n").slice(0, 4096);
   }
 
@@ -276,11 +361,15 @@ export async function createLiveMessage(title, intro = "Starting...") {
     state.flushRequested = false;
     const text = render();
     if (!state.messageId) {
-      const sent = await sendMessage(text);
+      const sent = await postTelegram("sendMessage", { text, parse_mode: "HTML" });
       state.messageId = sent?.result?.message_id ?? null;
       return;
     }
-    await editMessage(text, state.messageId);
+    await postTelegram("editMessageText", {
+      message_id: state.messageId,
+      text,
+      parse_mode: "HTML",
+    });
   }
 
   function scheduleFlush(delay = 300) {
@@ -295,8 +384,9 @@ export async function createLiveMessage(title, intro = "Starting...") {
 
   async function upsertToolLine(name, icon, suffix = "") {
     const label = toolLabel(name);
-    const line = `${icon} ${label}${suffix ? ` ${suffix}` : ""}`;
-    const idx = state.toolLines.findIndex((entry) => entry.includes(` ${label}`));
+    const escapedSuffix = suffix ? ` <code>${escapeHtml(suffix)}</code>` : "";
+    const line = `${icon} ${label}${escapedSuffix}`;
+    const idx = state.toolLines.findIndex((entry) => entry.includes(label));
     if (idx >= 0) state.toolLines[idx] = line;
     else state.toolLines.push(line);
     scheduleFlush();
@@ -307,12 +397,12 @@ export async function createLiveMessage(title, intro = "Starting...") {
 
   return {
     async toolStart(name) {
-      await upsertToolLine(name, "ℹ️", "...");
+      await upsertToolLine(name, "⏳", "running…");
     },
     async toolFinish(name, result, success) {
-      const icon = success ? "✅" : "❌";
+      const icon = success ? "✓" : "✗";
       const summary = summarizeToolResult(name, result);
-      await upsertToolLine(name, icon, summary ? `— ${summary}` : "");
+      await upsertToolLine(name, icon, summary);
     },
     async note(text) {
       state.intro = text;
@@ -324,7 +414,8 @@ export async function createLiveMessage(title, intro = "Starting...") {
         state.flushTimer = null;
       }
       if (state.flushPromise) await state.flushPromise;
-      state.footer = finalText;
+      // Final text from agent — render as plain (escaped) so it's safe regardless of content
+      state.footer = escapeHtml(finalText);
       await flushNow();
       _liveMessageDepth = Math.max(0, _liveMessageDepth - 1);
       typing.stop();
@@ -335,7 +426,7 @@ export async function createLiveMessage(title, intro = "Starting...") {
         state.flushTimer = null;
       }
       if (state.flushPromise) await state.flushPromise;
-      state.footer = `❌ ${errorText}`;
+      state.footer = `❌ <b>Error</b>\n<code>${escapeHtml(errorText)}</code>`;
       await flushNow();
       _liveMessageDepth = Math.max(0, _liveMessageDepth - 1);
       typing.stop();
@@ -401,49 +492,64 @@ export function stopPolling() {
 // ─── Notification helpers ────────────────────────────────────────
 export async function notifyDeploy({ pair, amountSol, position, tx, priceRange, rangeCoverage, binStep, baseFee }) {
   if (hasActiveLiveMessage()) return;
-  const priceStr = priceRange
-    ? `Price range: ${priceRange.min < 0.0001 ? priceRange.min.toExponential(3) : priceRange.min.toFixed(6)} – ${priceRange.max < 0.0001 ? priceRange.max.toExponential(3) : priceRange.max.toFixed(6)}\n`
-    : "";
-  const coverageStr = rangeCoverage
-    ? `Range cover: ${fmtPct(rangeCoverage.downside_pct)} downside | ${fmtPct(rangeCoverage.upside_pct)} upside | ${fmtPct(rangeCoverage.width_pct)} total\n`
-    : "";
-  const poolStr = (binStep || baseFee)
-    ? `Bin step: ${binStep ?? "?"}  |  Base fee: ${baseFee != null ? baseFee + "%" : "?"}\n`
-    : "";
-  await sendHTML(
-    `✅ <b>Deployed</b> ${pair}\n` +
-    `Amount: ${amountSol} SOL\n` +
-    priceStr +
-    coverageStr +
-    poolStr +
-    `Position: <code>${position?.slice(0, 8)}...</code>\n` +
-    `Tx: <code>${tx?.slice(0, 16)}...</code>`
-  );
+  const lines = [
+    `🚀 <b>Deployed</b> · ${escapeHtml(pair)}`,
+    DIVIDER,
+    `<b>Amount:</b>      ${fmtSol(amountSol)}`,
+  ];
+  if (priceRange) {
+    const lo = priceRange.min < 0.0001 ? Number(priceRange.min).toExponential(3) : Number(priceRange.min).toFixed(6);
+    const hi = priceRange.max < 0.0001 ? Number(priceRange.max).toExponential(3) : Number(priceRange.max).toFixed(6);
+    lines.push(`<b>Range:</b>       ${lo} – ${hi}`);
+  }
+  if (rangeCoverage) {
+    lines.push(`<b>Coverage:</b>    ↓${fmtPct(rangeCoverage.downside_pct)} · ↑${fmtPct(rangeCoverage.upside_pct)} · width ${fmtPct(rangeCoverage.width_pct)}`);
+  }
+  if (binStep != null || baseFee != null) {
+    lines.push(`<b>Pool:</b>        bin ${binStep ?? "?"} · fee ${baseFee != null ? baseFee + "%" : "?"}`);
+  }
+  lines.push(`<b>Position:</b>    <code>${escapeHtml(fmtAddr(position, 6, 6))}</code>`);
+  if (tx) lines.push(`<b>Tx:</b>          <code>${escapeHtml(fmtAddr(tx, 6, 6))}</code>`);
+  await sendHTML(lines.join("\n"));
 }
 
 export async function notifyClose({ pair, pnlUsd, pnlPct }) {
   if (hasActiveLiveMessage()) return;
-  const sign = pnlUsd >= 0 ? "+" : "";
+  const pnl = Number(pnlUsd) || 0;
+  const pct = Number(pnlPct) || 0;
+  const isWin = pnl >= 0;
+  const sign = isWin ? "+" : "";
+  const emoji = isWin ? "🟢" : "🔴";
   await sendHTML(
-    `🔒 <b>Closed</b> ${pair}\n` +
-    `PnL: ${sign}$${(pnlUsd ?? 0).toFixed(2)} (${sign}${(pnlPct ?? 0).toFixed(2)}%)`
+    [
+      `🔒 <b>Closed</b> · ${escapeHtml(pair)}`,
+      DIVIDER,
+      `${emoji} <b>PnL:</b> ${sign}${fmtUsd(pnl)} (${sign}${pct.toFixed(2)}%)`,
+    ].join("\n")
   );
 }
 
 export async function notifySwap({ inputSymbol, outputSymbol, amountIn, amountOut, tx }) {
   if (hasActiveLiveMessage()) return;
   await sendHTML(
-    `🔄 <b>Swapped</b> ${inputSymbol} → ${outputSymbol}\n` +
-    `In: ${amountIn ?? "?"} | Out: ${amountOut ?? "?"}\n` +
-    `Tx: <code>${tx?.slice(0, 16)}...</code>`
+    [
+      `🔄 <b>Swapped</b> · ${escapeHtml(inputSymbol)} → ${escapeHtml(outputSymbol)}`,
+      DIVIDER,
+      `<b>In:</b>  ${fmtNumber(amountIn, 4)} ${escapeHtml(inputSymbol)}`,
+      `<b>Out:</b> ${fmtNumber(amountOut, 4)} ${escapeHtml(outputSymbol)}`,
+      tx ? `<b>Tx:</b>  <code>${escapeHtml(fmtAddr(tx, 6, 6))}</code>` : null,
+    ].filter(Boolean).join("\n")
   );
 }
 
 export async function notifyOutOfRange({ pair, minutesOOR }) {
   if (hasActiveLiveMessage()) return;
   await sendHTML(
-    `⚠️ <b>Out of Range</b> ${pair}\n` +
-    `Been OOR for ${minutesOOR} minutes`
+    [
+      `⚠️ <b>Out of Range</b> · ${escapeHtml(pair)}`,
+      DIVIDER,
+      `Position has been out of range for <b>${minutesOOR}m</b>.`,
+    ].join("\n")
   );
 }
 

@@ -167,7 +167,12 @@ export const config = {
 
   // ─── HiveMind ─────────────────────────
   hiveMind: {
-    url: nonEmptyString(u.hiveMindUrl, DEFAULT_HIVEMIND_URL),
+    // Set HIVEMIND_DISABLED=true (or hiveMindDisabled=true in user-config.json) to fully turn off HiveMind.
+    // When disabled, the agent runs solo: no shared lessons, no presets, no community sync — only
+    // your own lessons.json and performance data are used. All HiveMind helpers in hivemind.js
+    // short-circuit via isHiveMindEnabled() so the rest of the agent is unaffected.
+    disabled: u.hiveMindDisabled === true || String(process.env.HIVEMIND_DISABLED || "").toLowerCase() === "true",
+    url: nonEmptyString(u.hiveMindUrl, process.env.HIVEMIND_URL, DEFAULT_HIVEMIND_URL),
     apiKey: nonEmptyString(u.hiveMindApiKey, process.env.HIVEMIND_API_KEY, DEFAULT_HIVEMIND_API_KEY),
     agentId: u.agentId ?? null,
     pullMode: u.hiveMindPullMode ?? "auto",
@@ -176,7 +181,7 @@ export const config = {
   api: {
     url: nonEmptyString(u.agentMeridianApiUrl, process.env.AGENT_MERIDIAN_API_URL, DEFAULT_AGENT_MERIDIAN_API_URL),
     publicApiKey: nonEmptyString(u.publicApiKey, process.env.PUBLIC_API_KEY, DEFAULT_AGENT_MERIDIAN_PUBLIC_KEY),
-    lpAgentRelayEnabled: u.lpAgentRelayEnabled ?? false,
+    lpAgentRelayEnabled: u.lpAgentRelayEnabled ?? (String(process.env.LPAGENT_RELAY_ENABLED || "").toLowerCase() === "true"),
   },
 
   jupiter: {

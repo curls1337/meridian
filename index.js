@@ -364,7 +364,7 @@ After executing, write a brief one-line result per position.
     if (!silent && telegramEnabled()) {
       if (mgmtReport) {
         if (liveMessage) await liveMessage.finalize(stripThink(mgmtReport)).catch(() => {});
-        else sendMessage(`🔄 Management Cycle\n\n${stripThink(mgmtReport)}`).catch(() => { });
+        else sendHTML(`🔄 <b>Management Cycle</b>\n━━━━━━━━━━━━━━━━━━\n${escapeHtmlReport(stripThink(mgmtReport))}`).catch(() => { });
       }
       for (const p of positions) {
         if (!p.in_range && p.minutes_out_of_range >= config.management.outOfRangeWaitMinutes) {
@@ -718,7 +718,7 @@ IMPORTANT:
     if (!silent && telegramEnabled()) {
       if (screenReport) {
         if (liveMessage) await liveMessage.finalize(stripThink(screenReport)).catch(() => {});
-        else sendMessage(`🔍 Screening Cycle\n\n${stripThink(screenReport)}`).catch(() => { });
+        else sendHTML(`🔍 <b>Screening Cycle</b>\n━━━━━━━━━━━━━━━━━━\n${escapeHtmlReport(stripThink(screenReport))}`).catch(() => { });
       }
     }
   }
@@ -962,45 +962,58 @@ function getLatestCandidatesMeta() {
 }
 
 function describeLatestCandidates(limit = 5) {
-  if (!_latestCandidates.length) return "No cached candidates yet. Run /screen first.";
+  if (!_latestCandidates.length) return "📊 <b>Candidates</b>\n\n<i>No cached candidates yet. Run /screen first.</i>";
   const lines = _latestCandidates.slice(0, limit).map((pool, i) => {
     const feeTvl = pool.fee_active_tvl_ratio ?? pool.fee_tvl_ratio ?? "?";
     const vol = pool.volume_window ?? pool.volume_24h ?? "?";
     const active = pool.active_pct ?? "?";
     const organic = pool.organic_score ?? "?";
-    return `${i + 1}. ${pool.name} | fee/aTVL ${feeTvl}% | vol $${vol} | in-range ${active}% | organic ${organic}`;
+    return `<b>${i + 1}.</b> ${escapeHtmlIdx(pool.name)}\n   fee/aTVL <code>${feeTvl}%</code> · vol <code>$${vol}</code> · range <code>${active}%</code> · organic <code>${organic}</code>`;
   });
   const age = _latestCandidatesAt ? new Date(_latestCandidatesAt).toLocaleString("en-US", { hour12: false }) : "unknown";
-  return `Latest candidates (${_latestCandidates.length}) — updated ${age}\n\n${lines.join("\n")}`;
+  return `📊 <b>Latest Candidates</b> · ${_latestCandidates.length} total\n<i>Updated ${age}</i>\n━━━━━━━━━━━━━━━━━━\n${lines.join("\n")}`;
 }
+
+function escapeHtmlIdx(text) {
+  return String(text ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
+// For long agent reports — escape HTML so the LLM's output never breaks Telegram parsing.
+const escapeHtmlReport = escapeHtmlIdx;
 
 function formatWalletStatus(wallet, positions) {
   const deployAmount = computeDeployAmount(wallet.sol);
-  const hive = isHiveMindEnabled() ? "on" : "off";
+  const hive = isHiveMindEnabled() ? "✅ on" : "⚪ off";
+  const dryRun = process.env.DRY_RUN === "true" ? "🟡 yes" : "🔴 no";
   return [
-    `Wallet: ${wallet.sol} SOL ($${wallet.sol_usd})`,
-    `SOL price: $${wallet.sol_price}`,
-    `Open positions: ${positions.total_positions}/${config.risk.maxPositions}`,
-    `Next deploy amount: ${deployAmount} SOL`,
-    `Dry run: ${process.env.DRY_RUN === "true" ? "yes" : "no"}`,
-    `HiveMind: ${hive}`,
+    `👛 <b>Wallet Status</b>`,
+    `━━━━━━━━━━━━━━━━━━`,
+    `<b>Balance:</b>    ◎${wallet.sol} <code>($${wallet.sol_usd})</code>`,
+    `<b>SOL price:</b>  $${wallet.sol_price}`,
+    `<b>Positions:</b>  ${positions.total_positions}/${config.risk.maxPositions} open`,
+    `<b>Next deploy:</b> ◎${deployAmount}`,
+    `<b>Dry run:</b>    ${dryRun}`,
+    `<b>HiveMind:</b>   ${hive}`,
   ].join("\n");
 }
 
 function formatConfigSnapshot() {
   return [
-    "Config snapshot",
-    "",
-    `Strategy: ${config.strategy.strategy} | binsBelow: ${config.strategy.minBinsBelow}-${config.strategy.maxBinsBelow} | default ${config.strategy.defaultBinsBelow}`,
-    `Deploy: ${config.management.deployAmountSol} SOL | gasReserve: ${config.management.gasReserve} | maxPositions: ${config.risk.maxPositions}`,
-    `Stop loss: ${config.management.stopLossPct}% | take profit: ${config.management.takeProfitPct}%`,
-    `Trailing: ${config.management.trailingTakeProfit ? "on" : "off"} | trigger ${config.management.trailingTriggerPct}% | drop ${config.management.trailingDropPct}%`,
-    `OOR: ${config.management.outOfRangeWaitMinutes}m | cooldown ${config.management.oorCooldownTriggerCount}x / ${config.management.oorCooldownHours}h`,
-    `Repeat deploy cooldown: ${config.management.repeatDeployCooldownEnabled ? "on" : "off"} | ${config.management.repeatDeployCooldownTriggerCount}x / ${config.management.repeatDeployCooldownHours}h | min fee earned ${config.management.repeatDeployCooldownMinFeeEarnedPct}% | ${config.management.repeatDeployCooldownScope}`,
-    `Yield floor: ${config.management.minFeePerTvl24h}% | min age ${config.management.minAgeBeforeYieldCheck}m`,
-    `Screening: ${config.screening.category} / ${config.screening.timeframe} | TVL ${config.screening.minTvl}-${config.screening.maxTvl}`,
-    `Intervals: manage ${config.schedule.managementIntervalMin}m | screen ${config.schedule.screeningIntervalMin}m`,
-    `HiveMind: ${isHiveMindEnabled() ? "enabled" : "disabled"}${config.hiveMind.agentId ? ` | ${config.hiveMind.agentId}` : ""}`,
+    `⚙️ <b>Config Snapshot</b>`,
+    `━━━━━━━━━━━━━━━━━━`,
+    `<b>Strategy:</b>    ${config.strategy.strategy} · binsBelow ${config.strategy.minBinsBelow}-${config.strategy.maxBinsBelow} (default ${config.strategy.defaultBinsBelow})`,
+    `<b>Deploy:</b>      ◎${config.management.deployAmountSol} · gas ◎${config.management.gasReserve} · max ${config.risk.maxPositions} positions`,
+    `<b>Stop / TP:</b>   ${config.management.stopLossPct}% / ${config.management.takeProfitPct}%`,
+    `<b>Trailing:</b>    ${config.management.trailingTakeProfit ? "on" : "off"} · trigger ${config.management.trailingTriggerPct}% · drop ${config.management.trailingDropPct}%`,
+    `<b>OOR:</b>         ${config.management.outOfRangeWaitMinutes}m · cooldown ${config.management.oorCooldownTriggerCount}× / ${config.management.oorCooldownHours}h`,
+    `<b>Re-deploy:</b>   ${config.management.repeatDeployCooldownEnabled ? "on" : "off"} · ${config.management.repeatDeployCooldownTriggerCount}× / ${config.management.repeatDeployCooldownHours}h · min fee ${config.management.repeatDeployCooldownMinFeeEarnedPct}% · ${config.management.repeatDeployCooldownScope}`,
+    `<b>Yield floor:</b> ${config.management.minFeePerTvl24h}% · min age ${config.management.minAgeBeforeYieldCheck}m`,
+    `<b>Screen:</b>      ${config.screening.category} · ${config.screening.timeframe} · TVL ${config.screening.minTvl}-${config.screening.maxTvl}`,
+    `<b>Schedule:</b>    manage ${config.schedule.managementIntervalMin}m · screen ${config.schedule.screeningIntervalMin}m`,
+    `<b>HiveMind:</b>    ${isHiveMindEnabled() ? "enabled" : "disabled"}${config.hiveMind.agentId ? ` · <code>${config.hiveMind.agentId}</code>` : ""}`,
   ].join("\n");
 }
 
@@ -1259,28 +1272,36 @@ async function applySettingsMenuCallback(msg) {
 
 function formatHelpText() {
   return [
-    "Telegram commands",
+    "<b>🤖 Meridian Commands</b>",
+    "━━━━━━━━━━━━━━━━━━",
+    "<b>📊 Status</b>",
+    "<code>/status</code> — wallet + positions snapshot",
+    "<code>/wallet</code> — wallet, deploy amount, HiveMind",
+    "<code>/positions</code> — list open positions",
+    "<code>/pool &lt;n&gt;</code> — detailed info for position #n",
+    "<code>/briefing</code> — morning briefing",
     "",
-    "/help — show commands",
-    "/status — wallet + positions snapshot",
-    "/wallet — wallet, deploy amount, HiveMind status",
-    "/positions — list open positions",
-    "/pool <n> — detailed info for one open position",
-    "/close <n> — close one position by index",
-    "/closeall — close all open positions",
-    "/set <n> <note> — set note/instruction on position",
-    "/config — show important runtime config",
-    "/settings — button menu for common config",
-    "/setcfg <key> <value> — update persisted config",
-    "/screen — refresh deterministic candidate list",
-    "/candidates — show latest cached candidates",
-    "/deploy <n> — deploy candidate by cached index",
-    "/briefing — morning briefing",
-    "/hive — HiveMind sync status",
-    "/hive pull — manual HiveMind pull now",
-    "/pause — stop cron cycles",
-    "/resume — start cron cycles again",
-    "/stop — shut down agent",
+    "<b>💼 Trading</b>",
+    "<code>/close &lt;n&gt;</code> — close position #n",
+    "<code>/closeall</code> — close all positions",
+    "<code>/set &lt;n&gt; &lt;note&gt;</code> — note on position",
+    "<code>/screen</code> — refresh candidate list",
+    "<code>/candidates</code> — show cached candidates",
+    "<code>/deploy &lt;n&gt;</code> — deploy candidate #n",
+    "",
+    "<b>⚙️ Configuration</b>",
+    "<code>/config</code> — runtime config snapshot",
+    "<code>/settings</code> — button menu",
+    "<code>/setcfg &lt;key&gt; &lt;value&gt;</code> — update config",
+    "",
+    "<b>🌐 Other</b>",
+    "<code>/hive</code> — HiveMind status",
+    "<code>/hive pull</code> — manual HiveMind pull",
+    "<code>/pause</code> — stop cron cycles",
+    "<code>/resume</code> — start cron cycles",
+    "<code>/stop</code> — shut down agent",
+    "",
+    "💡 <i>You can also chat freely — ask anything about pools, positions, or strategy.</i>",
   ].join("\n");
 }
 
@@ -1398,9 +1419,9 @@ async function telegramHandler(msg) {
   if (_managementBusy || _screeningBusy || busy) {
     if (_telegramQueue.length < 5) {
       _telegramQueue.push(msg);
-      sendMessage(`⏳ Queued (${_telegramQueue.length} in queue): "${text.slice(0, 60)}"`).catch(() => {});
+      sendHTML(`⏳ <b>Queued</b> · position ${_telegramQueue.length}\n<i>${escapeHtmlIdx(text.slice(0, 80))}</i>`).catch(() => {});
     } else {
-      sendMessage("Queue is full (5 messages). Wait for the agent to finish.").catch(() => {});
+      sendHTML("⚠️ <b>Queue is full</b> · max 5 messages\n<i>Wait for the agent to finish.</i>").catch(() => {});
     }
     return;
   }
@@ -1416,7 +1437,7 @@ async function telegramHandler(msg) {
   }
 
   if (text === "/help") {
-    await sendMessage(formatHelpText()).catch(() => {});
+    await sendHTML(formatHelpText()).catch(() => {});
     return;
   }
 
@@ -1424,33 +1445,45 @@ async function telegramHandler(msg) {
     try {
       const [wallet, positions] = await Promise.all([getWalletBalances(), getMyPositions({ force: true })]);
       const suffix = text === "/status" && positions.total_positions
-        ? `\n\nUse /positions for the numbered list.`
+        ? `\n\n<i>💡 Use /positions for the numbered list.</i>`
         : "";
-      await sendMessage(`${formatWalletStatus(wallet, positions)}${suffix}`).catch(() => {});
+      await sendHTML(`${formatWalletStatus(wallet, positions)}${suffix}`).catch(() => {});
     } catch (e) {
-      await sendMessage(`Error: ${e.message}`).catch(() => {});
+      await sendHTML(`❌ <b>Error</b>\n<code>${escapeHtmlIdx(e.message)}</code>`).catch(() => {});
     }
     return;
   }
 
   if (text === "/config") {
-    await sendMessage(formatConfigSnapshot()).catch(() => {});
+    await sendHTML(formatConfigSnapshot()).catch(() => {});
     return;
   }
 
   if (text === "/positions") {
     try {
       const { positions, total_positions } = await getMyPositions({ force: true });
-      if (total_positions === 0) { await sendMessage("No open positions."); return; }
+      if (total_positions === 0) {
+        await sendHTML("📊 <b>Open Positions</b>\n━━━━━━━━━━━━━━━━━━\n<i>No open positions.</i>");
+        return;
+      }
       const cur = config.management.solMode ? "◎" : "$";
       const lines = positions.map((p, i) => {
-        const pnl = p.pnl_usd >= 0 ? `+${cur}${p.pnl_usd}` : `-${cur}${Math.abs(p.pnl_usd)}`;
+        const pnlNum = Number(p.pnl_usd) || 0;
+        const pnlStr = pnlNum >= 0 ? `🟢 +${cur}${pnlNum}` : `🔴 -${cur}${Math.abs(pnlNum)}`;
         const age = p.age_minutes != null ? `${p.age_minutes}m` : "?";
-        const oor = !p.in_range ? " ⚠️OOR" : "";
-        return `${i + 1}. ${p.pair} | ${cur}${p.total_value_usd} | PnL: ${pnl} | fees: ${cur}${p.unclaimed_fees_usd} | ${age}${oor}`;
+        const oor = !p.in_range ? " ⚠️ <b>OOR</b>" : "";
+        return `<b>${i + 1}.</b> ${escapeHtmlIdx(p.pair)}${oor}\n   value <code>${cur}${p.total_value_usd}</code> · ${pnlStr} · fees <code>${cur}${p.unclaimed_fees_usd}</code> · ${age}`;
       });
-      await sendMessage(`📊 Open Positions (${total_positions}):\n\n${lines.join("\n")}\n\n/close <n> to close | /set <n> <note> to set instruction`);
-    } catch (e) { await sendMessage(`Error: ${e.message}`).catch(() => {}); }
+      await sendHTML([
+        `📊 <b>Open Positions</b> · ${total_positions}`,
+        "━━━━━━━━━━━━━━━━━━",
+        lines.join("\n"),
+        "",
+        `<i>💡 <code>/close &lt;n&gt;</code> · <code>/set &lt;n&gt; &lt;note&gt;</code></i>`,
+      ].join("\n"));
+    } catch (e) {
+      await sendHTML(`❌ <b>Error</b>\n<code>${escapeHtmlIdx(e.message)}</code>`).catch(() => {});
+    }
     return;
   }
 
@@ -1554,15 +1587,17 @@ async function telegramHandler(msg) {
 
   if (text === "/screen") {
     try {
-      await sendMessage(await runDeterministicScreen(5)).catch(() => {});
+      const result = await runDeterministicScreen(5);
+      // runDeterministicScreen returns plain text — wrap in HTML for consistency
+      await sendHTML(`🔍 <b>Screening</b>\n━━━━━━━━━━━━━━━━━━\n<pre>${escapeHtmlIdx(result)}</pre>`).catch(() => {});
     } catch (e) {
-      await sendMessage(`Error: ${e.message}`).catch(() => {});
+      await sendHTML(`❌ <b>Error</b>\n<code>${escapeHtmlIdx(e.message)}</code>`).catch(() => {});
     }
     return;
   }
 
   if (text === "/candidates") {
-    await sendMessage(describeLatestCandidates(5)).catch(() => {});
+    await sendHTML(describeLatestCandidates(5)).catch(() => {});
     return;
   }
 
